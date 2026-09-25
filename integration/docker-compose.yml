@@ -1,0 +1,60 @@
+# Redis and Valkey servers used by the integration / native-compatibility tests.
+#
+#   npm run docker:up      # start every version and wait until each answers PING
+#   npm run test:integration
+#   npm run docker:down
+#
+# Ports are deliberately non-default so these never collide with a local
+# Redis on 6379 or another project's test container.
+#
+# NOTE: the images ship `redis-cli` (`valkey-cli`). It is used ONLY by the
+# integration tests, to prove native interoperability (`docker exec`). The
+# library under test never invokes an external process — everything it does
+# goes through the RedisConnection abstraction.
+#
+# Persistence is off: these are scratch servers, and a test run must never
+# leave an RDB file behind.
+x-server: &server
+  command: ['--save', '', '--appendonly', 'no']
+  healthcheck:
+    test: ['CMD-SHELL', 'redis-cli ping || valkey-cli ping']
+    interval: 2s
+    timeout: 5s
+    retries: 30
+
+services:
+  redis62:
+    <<: *server
+    image: redis:6.2
+    container_name: dbgate-redis-dumper-62
+    ports:
+      - '36362:6379'
+
+  redis72:
+    <<: *server
+    image: redis:7.2
+    container_name: dbgate-redis-dumper-72
+    ports:
+      - '36372:6379'
+
+  redis74:
+    <<: *server
+    image: redis:7.4
+    container_name: dbgate-redis-dumper-74
+    ports:
+      - '36374:6379'
+
+  redis80:
+    <<: *server
+    image: redis:8.0
+    container_name: dbgate-redis-dumper-80
+    ports:
+      - '36380:6379'
+
+  valkey80:
+    <<: *server
+    image: valkey/valkey:8.0
+    container_name: dbgate-redis-dumper-valkey-80
+    command: ['valkey-server', '--save', '', '--appendonly', 'no']
+    ports:
+      - '36390:6379'
