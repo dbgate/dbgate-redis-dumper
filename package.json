@@ -1,0 +1,91 @@
+{
+  "name": "dbgate-redis-dumper",
+  "version": "0.1.0",
+  "description": "Standalone, client-agnostic Redis dump and restore library for Node.js, compatible with native redis-cli",
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dbgate/dbgate-redis-dumper.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dbgate/dbgate-redis-dumper/issues"
+  },
+  "homepage": "https://github.com/dbgate/dbgate-redis-dumper#readme",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "LICENSE",
+    "README.md",
+    "dist",
+    "docs"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./ioredis": {
+      "types": "./dist/ioredis.d.ts",
+      "import": "./dist/ioredis.js",
+      "require": "./dist/ioredis.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "clean": "tsup --clean",
+    "docker:down": "docker compose -f integration/docker-compose.yml down -v",
+    "docker:logs": "docker compose -f integration/docker-compose.yml logs -f",
+    "docker:up": "docker compose -f integration/docker-compose.yml up -d --wait",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint . --max-warnings 0",
+    "prepublishOnly": "npm run lint && npm run typecheck && npm test && npm run build && node scripts/smoke.mjs",
+    "test": "vitest run",
+    "test:all": "npm run test && npm run test:integration",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration:docker": "npm run docker:up && npm run test:integration",
+    "test:package": "npm run build && node scripts/smoke.mjs",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "redis",
+    "valkey",
+    "redis-cli",
+    "dump",
+    "backup",
+    "restore",
+    "database",
+    "ioredis"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "peerDependencies": {
+    "ioredis": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ioredis": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^22.20.4",
+    "eslint": "^9.39.5",
+    "ioredis": "^5.11.1",
+    "prettier": "^3.9.9",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.1",
+    "vitest": "^3.2.7"
+  }
+}

@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  # Fast gate: everything that needs no server. Runs on every push.
+  unit:
+    name: lint, typecheck, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run format:check
+      - run: npm test
+      # Proves the built dist/ loads as both ESM and CJS, and that the core
+      # entry point does not need the optional ioredis peer dependency.
+      - run: npm run test:package
+
+  # The interoperability matrix, against real servers. One job per version so a
+  # failure names the version, and so they run in parallel.
+  integration:
+    name: interop (${{ matrix.label }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Redis 6.2
+            target: redis62
+          - label: Redis 7.2
+            target: redis72
+          - label: Redis 7.4
+            target: redis74
+          - label: Redis 8.0
+            target: redis80
+          - label: Valkey 8.0
+            target: valkey80
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      # Started via docker compose rather than a service container: the
+      # integration tests reach the container by name to run its own
+      # redis-cli, which is how native interoperability is proven.
+      - name: Start ${{ matrix.label }}
+        run: docker compose -f integration/docker-compose.yml up -d --wait ${{ matrix.target }}
+
+      - name: Run integration tests
+        env:
+          # Turns "no server reachable" into a hard failure, so the suite can
+          # never silently no-op in CI.
+          REDIS_TEST_REQUIRED: '1'
+          REDIS_TEST_TARGETS: ${{ matrix.target }}
+        run: npm run test:integration
+
+      - name: Server logs on failure
+        if: failure()
+        run: docker compose -f integration/docker-compose.yml logs ${{ matrix.target }}
+
+      - name: Stop ${{ matrix.label }}
+        if: always()
+        run: docker compose -f integration/docker-compose.yml down -v
+
+  # Dumps from the oldest server restored onto the newest and onto Valkey,
+  # and preflight against an older target: needs several servers at once.
+  cross-version:
+    name: cross-version restores
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: docker compose -f integration/docker-compose.yml up -d --wait redis62 redis80 valkey80
+      - name: Run cross-version tests
+        env:
+          REDIS_TEST_REQUIRED: '1'
+          REDIS_TEST_TARGETS: redis62,redis80,valkey80
+        run: npx vitest run --config vitest.integration.config.ts -t "across versions"
+      - if: always()
+        run: docker compose -f integration/docker-compose.yml down -v
